@@ -17,6 +17,16 @@ const SOURCE = `
 
   var ORIGIN = '__APP_ORIGIN__';
   var PROXY = ORIGIN + '/api/render?u=';
+  /**
+   * Where this document really came from.
+   *
+   * document.baseURI is not trustworthy here. The injected <base> is the only thing
+   * making the page's own root-relative URLs resolve to the site instead of to this app,
+   * and a framework that renders the whole document (Next's App Router does) throws that
+   * element away the first time it re-renders <head>. Everything this script resolves goes
+   * against the address the proxy actually fetched, which nothing on the page can change.
+   */
+  var TARGET = '__TARGET_URL__';
   var REF = 'data-duo-ref';
   var MAX_ELEMENTS = 6000;
   var MAX_SAMPLES = 8;
@@ -31,8 +41,34 @@ const SOURCE = `
   }
 
   function absolute(value) {
-    try { return new URL(value, document.baseURI).toString(); } catch (err) { return null; }
+    try { return new URL(value, TARGET).toString(); } catch (err) { return null; }
   }
+
+  /**
+   * Put the <base> back when the page tears it out.
+   *
+   * React discards the server HTML and re-renders the document when hydration does not
+   * match, and anything in <head> that it does not own goes with it. Losing the base sends
+   * every image, stylesheet and link on the page to this app's origin instead of the
+   * site's: the symptom is a page that renders, then loses its assets and navigates to a
+   * 404 on the bench's own domain.
+   */
+  function holdBase() {
+    function ensure() {
+      var existing = document.querySelector('base');
+      if (existing && existing.getAttribute('href') === TARGET) return;
+      if (existing) existing.parentNode.removeChild(existing);
+      var base = document.createElement('base');
+      base.setAttribute('href', TARGET);
+      var head = document.head || document.documentElement;
+      head.insertBefore(base, head.firstChild);
+    }
+    ensure();
+    if (baseWatcher) return;
+    baseWatcher = new MutationObserver(ensure);
+    baseWatcher.observe(document.documentElement, { childList: true, subtree: true });
+  }
+  var baseWatcher = null;
 
   function toProxy(value) {
     var abs = absolute(value);
@@ -101,6 +137,8 @@ const SOURCE = `
         // workspace wait for a load event that is never coming, because nothing is
         // fetching a new document.
         post({ type: 'locationchange', url: logical });
+        TARGET = logical;
+        holdBase();
         var result = native.call(history, state, title, toProxy(logical));
         schedule(400);
         return result;
@@ -133,7 +171,7 @@ const SOURCE = `
     if (!form || !form.tagName) return;
     var method = (form.getAttribute('method') || 'get').toLowerCase();
     if (method !== 'get') return;
-    var action = absolute(form.getAttribute('action') || document.baseURI);
+    var action = absolute(form.getAttribute('action') || TARGET);
     if (!action) return;
     event.preventDefault();
     var url = new URL(action);
@@ -329,7 +367,7 @@ const SOURCE = `
     post({
       type: 'measurement',
       data: {
-        href: document.baseURI,
+        href: TARGET,
         title: document.title || '',
         layoutWidth: window.innerWidth,
         scrollWidth: scrollWidth,
@@ -421,11 +459,15 @@ const SOURCE = `
     });
   }
 
-  post({ type: 'ready', url: document.baseURI });
+  holdBase();
+  post({ type: 'ready', url: TARGET });
   schedule(document.readyState === 'complete' ? 30 : 300);
 })();
 `;
 
-export function probeSource(appOrigin: string): string {
-  return SOURCE.replace(/__APP_ORIGIN__/g, appOrigin);
+export function probeSource(appOrigin: string, targetUrl: string): string {
+  return SOURCE.replace(/__APP_ORIGIN__/g, appOrigin).replace(
+    /__TARGET_URL__/g,
+    targetUrl.replace(/['\\]/g, "\\$&"),
+  );
 }
