@@ -150,6 +150,46 @@ const SOURCE = `
   patchHistory('pushState');
   patchHistory('replaceState');
 
+  /**
+   * Proxy a stylesheet or script the page builds at runtime.
+   *
+   * The rewriter only ever sees the HTML the server sent. A bundler that appends its CSS
+   * chunk after hydration leaves that sheet cross-origin, cssRules throws on it, and the
+   * media queries inside it are invisible to the only question this tool asks. Insertion
+   * is the moment the fetch starts, so the URL is corrected there, by which point rel is
+   * always already set.
+   */
+  function proxyNode(node) {
+    if (!node || node.nodeType !== 1) return;
+    var tag = node.tagName;
+    if (tag === 'LINK') {
+      var rel = (node.getAttribute('rel') || '').toLowerCase().split(/s+/);
+      if (rel.indexOf('stylesheet') < 0 && rel.indexOf('preload') < 0) return;
+      var href = node.getAttribute('href');
+      if (href) node.setAttribute('href', toProxy(href));
+    } else if (tag === 'SCRIPT') {
+      var src = node.getAttribute('src');
+      if (src) node.setAttribute('src', toProxy(src));
+    }
+  }
+
+  function patchInsert(proto, name) {
+    var native = proto[name];
+    if (typeof native !== 'function') return;
+    proto[name] = function () {
+      try {
+        for (var i = 0; i < arguments.length; i++) proxyNode(arguments[i]);
+      } catch (err) { /* insert it as it is */ }
+      return native.apply(this, arguments);
+    };
+  }
+  patchInsert(Node.prototype, 'appendChild');
+  patchInsert(Node.prototype, 'insertBefore');
+  patchInsert(Element.prototype, 'append');
+  patchInsert(Element.prototype, 'prepend');
+  patchInsert(Element.prototype, 'after');
+  patchInsert(Element.prototype, 'before');
+
   // Keep navigation inside the device instead of replacing the workspace.
   document.addEventListener('click', function (event) {
     if (event.defaultPrevented || event.button !== 0) return;
