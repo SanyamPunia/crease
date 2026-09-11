@@ -549,6 +549,29 @@ try {
   check("the indicator slides by default", /transform/.test(full.pill), full.pill);
   check("and only crossfades under reduce", !/transform/.test(reduced.pill), reduced.pill);
   check("colour transitions survive reduce", reduced.press !== "0s", `press ${reduced.press}`);
+
+  console.log("\nThe proxy refuses what it should");
+  const proxy = (target) =>
+    fetch(`${BASE}/api/render?u=${encodeURIComponent(target)}`, { redirect: "manual" });
+  const metadata = await proxy("http://169.254.169.254/latest/meta-data/");
+  check(
+    "link-local addresses are blocked",
+    metadata.status === 403,
+    `status ${metadata.status}`,
+  );
+  const privateNet = await proxy("http://10.0.0.1/");
+  check("private ranges are blocked", privateNet.status === 403, `status ${privateNet.status}`);
+  const scheme = await proxy("file:///etc/passwd");
+  check("non-http schemes are refused", scheme.status === 400, `status ${scheme.status}`);
+  const demo = await proxy(`${BASE}/demo`);
+  check("the app's own page still loads", demo.status === 200, `status ${demo.status}`);
+  check(
+    "the proxy is not a cors bypass",
+    demo.headers.get("access-control-allow-origin") === null,
+    demo.headers.get("access-control-allow-origin") ?? "absent",
+  );
+  const robots = await (await fetch(`${BASE}/robots.txt`)).text();
+  check("robots keeps crawlers off the proxy", /Disallow: \/api\//.test(robots));
 } finally {
   await browser.close();
 }
