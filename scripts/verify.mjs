@@ -614,6 +614,49 @@ try {
     "the probe is told where the document came from",
     rewritten.includes(`var TARGET = '${fixture}'`),
   );
+  // An attribute is entity-encoded, so ?w=48&amp;q=75 read raw becomes a parameter named
+  // "amp;q" and the target loses every parameter after the first. An image optimiser
+  // answers 400 to that, and the picture never arrives.
+  const preload = /imagesrcset="([^"]*)"/i.exec(headHtml)?.[1] ?? "";
+  check(
+    "entities are decoded before a url is parsed",
+    !preload.includes("amp%3B"),
+    preload.slice(0, 60),
+  );
+  check(
+    "and both srcset candidates are rewritten",
+    (preload.match(/\/api\/render\?u=/g) ?? []).length === 2 && / 1x, | 2x$/.test(preload),
+  );
+  // A font preload is fetched in CORS mode either way. Dropping the attribute left the
+  // preload and the real request in different credentials modes, so the font loaded twice.
+  check(
+    "crossorigin survives on a font preload",
+    /<link\b[^>]*rel="preload"[^>]*as="font"[^>]*crossorigin/i.test(headHtml) ||
+      /<link\b[^>]*as="font"[^>]*crossorigin[^>]*>/i.test(headHtml),
+  );
+
+  // A module's relative imports resolve against its own URL, which through here is the
+  // proxy's path. Without recovery those land on /api/<chunk> and a code-split site
+  // silently loses chunks.
+  const stray = await fetch(`${BASE}/api/some-chunk.js`, {
+    redirect: "manual",
+    headers: {
+      referer: `${BASE}/api/render?u=${encodeURIComponent("https://example.com/a/b.js")}`,
+    },
+  });
+  const strayTo = stray.headers.get("location") ?? "";
+  check(
+    "a stray chunk is resolved against the importing module",
+    stray.status === 307 &&
+      strayTo.includes(encodeURIComponent("https://example.com/a/some-chunk.js")),
+    `${stray.status} ${strayTo.slice(-52)}`,
+  );
+  const orphan = await fetch(`${BASE}/api/some-chunk.js`, { redirect: "manual" });
+  check(
+    "and a stray with no referer is refused",
+    orphan.status === 404,
+    `status ${orphan.status}`,
+  );
 
   console.log("\nThe proxy refuses what it should");
   const proxy = (target) =>
