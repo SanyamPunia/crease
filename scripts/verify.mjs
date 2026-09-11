@@ -550,6 +550,37 @@ try {
   check("and only crossfades under reduce", !/transform/.test(reduced.pill), reduced.pill);
   check("colour transitions survive reduce", reduced.press !== "0s", `press ${reduced.press}`);
 
+  console.log("\nThe address bar is the share button");
+  const share = await browser.newPage();
+  await share.goto(BASE, { waitUntil: "networkidle2" });
+  await wait(2200);
+  const demoPath = await share.evaluate(() => location.pathname + location.search);
+  check("the demo stays at the root", demoPath === "/", demoPath);
+  await share.evaluate(() => {
+    const input = document.querySelector('input[aria-label="Address"]');
+    const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+    setter.call(input, "example.com");
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    input.form.requestSubmit();
+  });
+  await wait(2500);
+  const shared = await share.evaluate(() => location.pathname + location.search);
+  check(
+    "a tested site lands in the address",
+    shared === `/preview?url=${encodeURIComponent("https://example.com/")}`,
+    shared,
+  );
+  check(
+    "and in the tab title",
+    (await share.title()).startsWith("example.com"),
+    await share.title(),
+  );
+  // Testing a second site must not stack a history entry, or Back walks through
+  // someone else's site instead of leaving the bench.
+  const depth = await share.evaluate(() => history.length);
+  check("without stacking history", depth <= 2, `${depth} entries`);
+  await share.close();
+
   console.log("\nThe proxy refuses what it should");
   const proxy = (target) =>
     fetch(`${BASE}/api/render?u=${encodeURIComponent(target)}`, { redirect: "manual" });
