@@ -24,6 +24,19 @@ is the same bench with a different starting address, for direct links.
 A cold visitor gets a verdict in under a second with nothing typed. That is the whole
 pitch, and it is why the product does not need one written down.
 
+## The address bar is the share button
+
+The browser already has a share button, so the bench's own address names what is on screen.
+`workspace.tsx` writes `/preview?url=` on every change to the site under test, including the
+framed page's own client-side route changes, and the tab title follows it.
+
+`replaceState`, never `pushState`. Pushing a route change the user did not make fills the
+history with entries they never navigated to, and Back then walks backwards through someone
+else's site instead of leaving the bench.
+
+The demo is the exception and stays at `/`. It is what a cold visitor is given, so it does
+not want a query string pointing back at this deployment.
+
 ## The three-stage engine
 
 A request moves through three stages, and each one exists because the stage before it is

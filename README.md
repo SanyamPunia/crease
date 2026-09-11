@@ -69,6 +69,9 @@ Drag the grip on the device's moving edge, or focus it and use the arrow keys.
 `/` is the bench, already open on a demo page that reflows across the fold. A verdict is on
 screen in under a second with nothing typed. Type over the address to test your own site.
 
+The bench's address follows what you are testing, so the link in the browser is always a
+link to what is on screen. Copy it and it opens on the same site for whoever you send it to.
+
 ## Running it
 
 ```bash
