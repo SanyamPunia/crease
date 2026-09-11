@@ -1,0 +1,254 @@
+@import "tailwindcss";
+
+/* Touch fires a phantom hover on tap that then sticks. Every hover affordance is gated
+   behind a pointer that can actually hover. */
+@custom-variant can-hover (@media (hover: hover) and (pointer: fine));
+
+/* Light only: the bench renders web pages on a white screen, and dark chrome around a
+   white rectangle is a glare sandwich. Near-white paper, pure white surfaces, soft rules. */
+:root {
+  --paper: #f3f3f1;
+  --surface: #ffffff;
+  --surface-sunk: #f0f0ed;
+  --hover: #edede9;
+
+  --ink: #1a1a1d;
+  --ink-muted: #67676f;
+  --ink-faint: #9c9ca4;
+  --ink-inverse: #ffffff;
+
+  --rule: #e7e7e3;
+  --rule-strong: #d6d6d1;
+
+  /* System green, deepened until it holds as text on white.
+     The accent and the passing verdict are one colour on purpose. The old orange did the
+     opposite job: it was the brand AND close enough to the failure red that a good run and
+     a bad one looked alike at a glance. Green can never make that mistake, because nothing
+     in this app that is wrong is ever green. Red is the verdict, amber is the caveat. */
+  --crease: #0f7a52;
+  --crease-soft: #e8f4ed;
+  /* The mark's two planes and its crease. Tokens because the wordmark uses them live. */
+  --crease-shade: #0a5b3d;
+  --crease-light: #d5eee1;
+
+  /* Selection sits between the two: unmistakably highlighted, but a tint rather than the
+     full accent, which shouts on a near-white page. */
+  --selection: #c6e8d5;
+  --selection-ink: #06301f;
+
+  --pass: #0f7a52;
+  --pass-soft: #e8f4ed;
+  --warn: #9a6b00;
+  --warn-soft: #f8f0db;
+  --fail: #d1332a;
+  --fail-soft: #fbe8e6;
+
+  --shell: #2c2c30;
+  --shell-edge: #4d4d53;
+  /* The screen shows a web page, so it is white regardless of anything here, and its
+     loading placeholder needs a tone of its own rather than the interface hover wash. */
+  --screen: #ffffff;
+  --screen-ghost: #eeeef0;
+}
+
+@theme inline {
+  --color-paper: var(--paper);
+  --color-surface: var(--surface);
+  --color-surface-sunk: var(--surface-sunk);
+  --color-hover: var(--hover);
+
+  --color-ink: var(--ink);
+  --color-ink-muted: var(--ink-muted);
+  --color-ink-faint: var(--ink-faint);
+  --color-ink-inverse: var(--ink-inverse);
+
+  --color-rule: var(--rule);
+  --color-rule-strong: var(--rule-strong);
+
+  --color-crease: var(--crease);
+  --color-crease-soft: var(--crease-soft);
+
+  --color-pass: var(--pass);
+  --color-pass-soft: var(--pass-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --color-fail: var(--fail);
+  --color-fail-soft: var(--fail-soft);
+
+  --color-shell: var(--shell);
+  --color-shell-edge: var(--shell-edge);
+  --color-screen: var(--screen);
+  --color-screen-ghost: var(--screen-ghost);
+
+  /* Two faces. Plus Jakarta Sans carries everything a person reads: open counters and
+     generous sidebearings, so small labels stay legible without tightening. Plex Mono is
+     reserved for what is read as data: measurements, addresses, CSS selectors. */
+  --font-sans: var(--font-jakarta), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-plex-mono), ui-monospace, "SFMono-Regular", monospace;
+
+  /* Named scale, small end first because this is a dense instrument. */
+  --text-tick: 0.625rem;
+  --text-tick--line-height: 1;
+  --text-tick--letter-spacing: 0.01em;
+  --text-micro: 0.6875rem;
+  --text-micro--line-height: 1.05rem;
+  --text-micro--letter-spacing: 0.008em;
+  --text-label: 0.8125rem;
+  --text-label--line-height: 1.15rem;
+  --text-body: 0.875rem;
+  --text-body--line-height: 1.5rem;
+  --text-lede: 1rem;
+  --text-lede--line-height: 1.65;
+  --text-title: 1.75rem;
+  --text-title--line-height: 1.15;
+  --text-title--letter-spacing: -0.015em;
+  --text-section: clamp(1.25rem, 2.2vw, 1.5rem);
+  --text-section--line-height: 1.25;
+  --text-section--letter-spacing: -0.01em;
+  --text-hero: clamp(2rem, 4.4vw, 2.875rem);
+  --text-hero--line-height: 1.08;
+  --text-hero--letter-spacing: -0.022em;
+
+  /* The fold is the subject, so it gets its own timing. Controls keep 150 and 200ms. */
+  --ease-fold: cubic-bezier(0.32, 0.72, 0, 1);
+  --duration-fold: 620ms;
+  /* The device is already on screen and moving rather than entering, so the turn eases at
+     both ends. The fold's curve launches hard by design, which on a 90 degree rotation of
+     something this large reads as a snap rather than as weight. */
+  --ease-turn: cubic-bezier(0.65, 0, 0.35, 1);
+  --duration-turn: 560ms;
+
+  --radius-xs: 0.375rem;
+  --radius-sm: 0.5rem;
+  --radius-md: 0.625rem;
+  --radius-lg: 0.875rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.25rem;
+}
+
+@layer base {
+  * {
+    border-color: var(--rule);
+  }
+
+  html {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--paper);
+    color: var(--ink);
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  ::selection {
+    background-color: var(--selection);
+    color: var(--selection-ink);
+  }
+}
+
+@layer components {
+  /* The project focus pattern. One definition, used by every focusable control. */
+  .focus-ring {
+    @apply outline-none focus-visible:ring-2 focus-visible:ring-crease focus-visible:ring-offset-2 focus-visible:ring-offset-paper;
+  }
+
+  /* Panel and rail headings. Sentence case: an uppercase tracked label is a costume,
+     and none of the interfaces worth copying use one. */
+  .eyebrow {
+    @apply font-sans font-medium text-micro text-ink-faint;
+  }
+
+  /* A hairline that composites with the surface under it rather than sitting on top,
+     which is what keeps a white card on a grey ground from looking outlined. */
+  .hairline {
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.06),
+      0 1px 2px rgb(0 0 0 / 0.04);
+  }
+
+  .hairline-raised {
+    box-shadow:
+      inset 0 0 0 1px rgb(0 0 0 / 0.06),
+      0 1px 2px rgb(0 0 0 / 0.05),
+      0 4px 12px -4px rgb(0 0 0 / 0.06);
+  }
+
+  /* Anything read as data rather than as language: a width, an address, a selector. */
+  .numeral {
+    @apply font-mono tabular-nums;
+  }
+
+  /* The reflow blur.
+   *
+   * Crossing a breakpoint snaps the page inside the device from one column to two. iOS
+   * masks that same snap when a device folds: content softens, reflows behind the blur,
+   * and sharpens once it has settled. Two identical keyframes under different names so
+   * the animation restarts on every change, which a single re-applied class does not. */
+  .fold-settle-a {
+    animation: fold-settle-a var(--duration-fold) var(--ease-fold);
+  }
+
+  .fold-settle-b {
+    animation: fold-settle-b var(--duration-fold) var(--ease-fold);
+  }
+
+  /* Drafting-paper grid behind the device stage. */
+  .drafting-grid {
+    background-image:
+      linear-gradient(to right, var(--rule) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--rule) 1px, transparent 1px);
+    background-size: 24px 24px;
+    background-position: -1px -1px;
+    opacity: 0.5;
+  }
+}
+
+/* Reduced motion is a second variant, not a delete.
+ *
+ * The rule this replaced flattened every duration to 0.01ms, which removed the meaning
+ * along with the motion: the fold, the selection and the press all stopped saying anything.
+ * What goes is movement. What stays is everything that carries state without travelling. */
+@media (prefers-reduced-motion: reduce) {
+  /* The turn blur masks a jump. Under reduce nothing glides, so there is no jump to mask. */
+  .fold-settle-a,
+  .fold-settle-b {
+    animation: none;
+  }
+
+  /* The drafting grid is ambient and conveys nothing. */
+  .drafting-grid {
+    opacity: 0.35;
+  }
+
+  /* Looping motion. The skeleton still reads as a placeholder without the pulse, and the
+     sweep still reads as running from the strip filling in. */
+  .animate-pulse {
+    animation: none;
+  }
+}
+
+@keyframes fold-settle-a {
+  0% {
+    filter: blur(0);
+  }
+  32% {
+    filter: blur(5px);
+  }
+  100% {
+    filter: blur(0);
+  }
+}
+
+@keyframes fold-settle-b {
+  0% {
+    filter: blur(0);
+  }
+  32% {
+    filter: blur(5px);
+  }
+  100% {
+    filter: blur(0);
+  }
+}
