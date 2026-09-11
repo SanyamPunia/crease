@@ -15,14 +15,21 @@ const plexMono = IBM_Plex_Mono({
   display: "swap",
 });
 
+// Vercel sets this on a deployment, with no protocol. Absolute metadata URLs need it,
+// and without a base Next resolves them against localhost.
+const siteUrl = process.env.VERCEL_PROJECT_PRODUCTION_URL
+  ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+  : "http://localhost:4123";
+
 export const metadata: Metadata = {
+  metadataBase: new URL(siteUrl),
   title: "Crease, layout testing for the iPhone Duo",
   description:
     "Load any site at every width between the iPhone Duo cover display and the unfolded inner display, and read what breaks from inside the page.",
 };
 
 export const viewport: Viewport = {
-  themeColor: "#f7f7f5",
+  themeColor: "#f3f3f1",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
