@@ -1,10 +1,11 @@
-import { assertPublicTarget } from "@/lib/net-guard";
+import { fetchTarget, readCappedText, TargetError } from "@/lib/fetch-target";
 import { appOrigin } from "@/lib/origin";
 import { extractTitle, extractViewportMeta, framingBlocks } from "@/lib/proxy";
 import { MOBILE_USER_AGENT, normalizeInput } from "@/lib/url";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
+export const maxDuration = 30;
 
 export interface InspectResult {
   url: string;
@@ -24,41 +25,41 @@ export async function GET(request: Request): Promise<Response> {
   }
 
   const parsed = new URL(normalized.url);
-  try {
-    await assertPublicTarget(parsed, appOrigin(request));
-  } catch (error) {
-    return Response.json({ error: (error as Error).message }, { status: 403 });
-  }
-
   let upstream: Response;
+  let finalUrl: string;
   try {
-    upstream = await fetch(parsed, {
-      redirect: "follow",
-      signal: AbortSignal.timeout(15_000),
+    const result = await fetchTarget(parsed, {
+      selfOrigin: appOrigin(request),
+      timeoutMs: 15_000,
       headers: {
         "user-agent": MOBILE_USER_AGENT,
         accept: "text/html,application/xhtml+xml,*/*;q=0.8",
         "accept-language": "en-US,en;q=0.9",
       },
     });
+    upstream = result.response;
+    finalUrl = result.url;
   } catch (error) {
-    const timedOut = (error as Error).name === "TimeoutError";
-    return Response.json(
-      {
-        error: timedOut
-          ? "The site did not answer within 15 seconds."
-          : `${parsed.hostname} could not be reached.`,
-      },
-      { status: 502 },
-    );
+    const status = error instanceof TargetError ? error.status : 403;
+    return Response.json({ error: (error as Error).message }, { status });
   }
 
   const contentType = upstream.headers.get("content-type") ?? "";
   const isHtml = contentType.includes("text/html");
-  const body = isHtml ? await upstream.text() : "";
+  let body = "";
+  if (isHtml) {
+    try {
+      body = await readCappedText(upstream);
+    } catch (error) {
+      const status = error instanceof TargetError ? error.status : 502;
+      return Response.json({ error: (error as Error).message }, { status });
+    }
+  } else {
+    await upstream.body?.cancel();
+  }
 
   const result: InspectResult = {
-    url: upstream.url || parsed.toString(),
+    url: finalUrl,
     status: upstream.status,
     title: isHtml ? extractTitle(body) : null,
     viewportMetaRaw: isHtml ? extractViewportMeta(body) : null,
