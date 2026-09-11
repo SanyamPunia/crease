@@ -75,6 +75,21 @@ and an address bar reading `site.com/api/render?u=...`.
 **Only GET is rewritten.** The render route answers GET, so rewriting a POST turns a
 site's analytics beacon into a 405. Those requests are left alone and fail on their own.
 
+**The injection goes at the end of `<head>`, and the head's own URLs are rewritten.** Two
+elements pushed in front of the site's first `<meta>` shift every child React expects, so
+hydration fails, React discards the server HTML and re-renders the whole document, and
+everything in `<head>` it does not own goes with it, including the `<base>`. Without the
+base, every root-relative URL on the page resolves to this app: images 400 at our own
+image optimiser, RSC requests 404, and a link to `/work` navigates the frame to the bench's
+own 404. Moving the base to the end of the head fixes hydration but leaves every stylesheet,
+script and preload above it already fetching, so those are made absolute by the rewriter
+instead. The base stays for what the page resolves later, at runtime.
+
+**The probe resolves against the address the proxy fetched, not `document.baseURI`.** The
+base is one element on a page that is free to remove it. `TARGET` is a constant compiled
+into the injected source and updated on each client-side route change, and the probe also
+re-inserts the base whenever the page tears it out.
+
 **A history change posts `locationchange`, never `navigate`.** `navigate` means a document
 is loading, and the workspace waits for a load event before it will measure again. A
 client-side route change loads nothing, so calling it a navigation leaves `loading` stuck
