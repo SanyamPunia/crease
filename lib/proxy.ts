@@ -1,17 +1,48 @@
 import { probeSource } from "./probe";
 
+const ENTITIES: Record<string, string> = {
+  amp: "&",
+  lt: "<",
+  gt: ">",
+  quot: '"',
+  apos: "'",
+  "#39": "'",
+  nbsp: "\u00a0",
+};
+
+/**
+ * An attribute value is entity-encoded, and a URL is parsed from the decoded form.
+ *
+ * `&` is written `&amp;` in HTML, so a srcset of `?url=x&amp;w=48` parses as a parameter
+ * literally named `amp;w` if it is read raw. The rewritten URL then reaches the target
+ * missing every parameter after the first, and an image optimiser answers 400.
+ */
+function decodeEntities(value: string): string {
+  return value.replace(/&(#x?[0-9a-f]+|[a-z]+);/gi, (whole, name: string) => {
+    const key = name.toLowerCase();
+    if (key.startsWith("#x")) {
+      return String.fromCodePoint(Number.parseInt(key.slice(2), 16)) || whole;
+    }
+    if (key.startsWith("#")) {
+      return String.fromCodePoint(Number.parseInt(key.slice(1), 10)) || whole;
+    }
+    return ENTITIES[key] ?? whole;
+  });
+}
+
 /** Read one attribute out of a raw tag string. */
 function attr(tag: string, name: string): string | null {
   const match = tag.match(
     new RegExp(`\\b${name}\\s*=\\s*("([^"]*)"|'([^']*)'|([^\\s"'>]+))`, "i"),
   );
   if (!match) return null;
-  return match[2] ?? match[3] ?? match[4] ?? null;
+  const raw = match[2] ?? match[3] ?? match[4];
+  return raw === undefined ? null : decodeEntities(raw);
 }
 
 function setAttr(tag: string, name: string, value: string): string {
   const pattern = new RegExp(`\\b${name}\\s*=\\s*("[^"]*"|'[^']*'|[^\\s"'>]+)`, "i");
-  const encoded = `${name}="${value.replace(/"/g, "&quot;")}"`;
+  const encoded = `${name}="${value.replace(/&/g, "&amp;").replace(/"/g, "&quot;")}"`;
   if (pattern.test(tag)) return tag.replace(pattern, encoded);
   return tag.replace(/\s*\/?>$/, (end) => ` ${encoded}${end}`);
 }
@@ -38,6 +69,24 @@ function toProxy(value: string, base: string, appOrigin: string): string | null 
   } catch {
     return null;
   }
+}
+
+/**
+ * Rewrite a `srcset`, which is a comma-separated list of `url descriptor` pairs.
+ *
+ * A URL in a srcset may itself contain a comma (`/_next/image?url=a,b`), so the split has
+ * to be on a comma that a descriptor follows, not on every comma.
+ */
+function rewriteSrcset(value: string, base: string, appOrigin: string): string {
+  return value
+    .split(/\s*,\s*(?=[^\s,]+(?:\s+[\d.]+[wx])?\s*(?:,|$))/)
+    .map((candidate) => {
+      const match = candidate.trim().match(/^(\S+)(\s+.*)?$/);
+      if (!match) return candidate;
+      const proxied = toProxy(match[1], base, appOrigin);
+      return proxied ? `${proxied}${match[2] ?? ""}` : candidate;
+    })
+    .join(", ");
 }
 
 /**
@@ -98,11 +147,33 @@ export function rewriteHtml(html: string, finalUrl: string, appOrigin: string): 
   out = out.replace(/<link\b[^>]*>/gi, (tag) => {
     const rel = (attr(tag, "rel") ?? "").toLowerCase();
     if (!rel.split(/\s+/).some((value) => FETCHING_RELS.has(value))) return tag;
+    let next = tag;
     const href = attr(tag, "href");
-    if (!href) return tag;
-    const proxied = toProxy(href, finalUrl, appOrigin);
-    if (!proxied) return tag;
-    return dropAttr(dropAttr(setAttr(tag, "href", proxied), "integrity"), "crossorigin");
+    if (href) {
+      const proxied = toProxy(href, finalUrl, appOrigin);
+      if (proxied) next = setAttr(next, "href", proxied);
+    }
+    // An image preload carries its candidates in imagesrcset and often has no href at all.
+    const imageSrcset = attr(next, "imagesrcset");
+    if (imageSrcset) {
+      next = setAttr(next, "imagesrcset", rewriteSrcset(imageSrcset, finalUrl, appOrigin));
+    }
+    if (next === tag) return tag;
+    return dropAttr(next, "integrity");
+  });
+
+  // A preload and the element that consumes it have to agree on the URL, or the browser
+  // downloads the image twice and warns that the preload went unused.
+  out = out.replace(/<(img|source)\b[^>]*>/gi, (tag) => {
+    let next = tag;
+    const src = attr(tag, "src");
+    if (src) {
+      const proxied = toProxy(src, finalUrl, appOrigin);
+      if (proxied) next = setAttr(next, "src", proxied);
+    }
+    const srcset = attr(next, "srcset");
+    if (srcset) next = setAttr(next, "srcset", rewriteSrcset(srcset, finalUrl, appOrigin));
+    return next;
   });
 
   out = out.replace(/<script\b[^>]*>/gi, (tag) => {
@@ -110,7 +181,7 @@ export function rewriteHtml(html: string, finalUrl: string, appOrigin: string): 
     if (!src) return tag;
     const proxied = toProxy(src, finalUrl, appOrigin);
     if (!proxied) return tag;
-    return dropAttr(dropAttr(setAttr(tag, "src", proxied), "integrity"), "crossorigin");
+    return dropAttr(setAttr(tag, "src", proxied), "integrity");
   });
 
   // A url() inside an inline <style> resolves the same way, and a font declared in the
