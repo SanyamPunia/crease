@@ -85,6 +85,35 @@ own 404. Moving the base to the end of the head fixes hydration but leaves every
 script and preload above it already fetching, so those are made absolute by the rewriter
 instead. The base stays for what the page resolves later, at runtime.
 
+**Attribute values are entity-decoded before a URL is parsed out of them.** `&` is written
+`&amp;` in HTML, so a srcset of `?url=x&amp;w=48` read raw becomes a parameter literally
+named `amp;w`. The rewritten URL then reaches the site missing every parameter after the
+first, and an image optimiser answers 400.
+
+**`crossorigin` survives on a rewritten preload, `integrity` does not.** A font is fetched
+in CORS mode whether or not the attribute is there, so dropping it left the preload and the
+real request in different credentials modes and the font downloaded twice. The URL is
+same-origin now, so the attribute costs nothing. `integrity` still goes, because a rewritten
+stylesheet no longer hashes to what the page claims.
+
+**A request that resolves against the proxy's own path is recovered from the referer.** A
+module's relative imports resolve against that module's URL, which here is
+`/api/render?u=...`, so `import "./chunk.js"` asks for `/api/chunk.js`. `app/api/[...stray]`
+reads the importing module's address out of the referer, resolves the stray path against it
+and redirects to a proper proxy URL. The `<base>` cannot help: it applies to the document,
+not to module resolution.
+
+A bundler that derives its public path from `document.currentScript.src` is still wrong
+through this proxy, because that src is a query string rather than a directory. GitHub's CSS
+chunks 404 for exactly that reason. Fixing it properly means proxying on a path that mirrors
+the target rather than in a query parameter.
+
+**The probe proxies stylesheets and scripts the page adds after load.** The rewriter only
+ever sees the HTML the server sent, so a bundler that appends its CSS chunk after hydration
+leaves that sheet cross-origin and `cssRules` throws on it, which hides the media queries
+this tool exists to read. Insertion is the moment the fetch starts, so the URL is corrected
+in `appendChild` and its siblings.
+
 **The probe resolves against the address the proxy fetched, not `document.baseURI`.** The
 base is one element on a page that is free to remove it. `TARGET` is a constant compiled
 into the injected source and updated on each client-side route change, and the probe also
