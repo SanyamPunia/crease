@@ -43,6 +43,16 @@ everything is fine.
 Requests that resolve to a private address are refused, so the proxy cannot be pointed at
 the network the server sits in.
 
+## Deploying it
+
+The proxy serves pages from this app's own origin, which is what makes their media queries
+readable and their elements addressable. That means a page under test runs its own
+JavaScript on this origin, so deploy it on a domain that does nothing else: no auth, no
+cookies, no second product.
+
+`app/robots.ts` keeps crawlers off `/api/` and `/preview`. The render route is an open
+proxy, so a public deployment wants a platform rate limit on it.
+
 ## Controls
 
 | Key | Action |

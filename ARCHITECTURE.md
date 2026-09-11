@@ -82,6 +82,35 @@ to an origin it does not recognise, so opening the bench on the loopback address
 `localhost` blocks hydration with nothing logged in the browser. Production is unaffected,
 which makes this look like a code bug until you read the dev server log.
 
+**Redirects are followed by hand, not by `fetch`.** `redirect: "follow"` checks only the
+address that was typed. A public hostname answering 302 with a `Location` of
+`http://169.254.169.254/` is then followed with nothing looking at it, which walks straight
+past the private-address guard. `lib/fetch-target.ts` takes the hops itself and runs
+`assertPublicTarget` on every one, under a single deadline for the whole chain.
+
+**Bodies are read with a ceiling.** `Response.text()` has none, so one 500MB response takes
+the function down. HTML and CSS are counted off the stream and refused past 8MB. Everything
+else streams straight through and is never held in memory.
+
+## Deploying it
+
+The proxy serves attacker-controlled pages **from this app's own origin**, and that is not
+an oversight: same-origin is what makes the media queries readable and the elements
+addressable. It has three consequences that outlive any one change.
+
+- **Nothing sensitive may ever live on this origin.** No auth, no cookies, no
+  `localStorage`, no second product on the same domain. A page under test runs its own
+  JavaScript here and can reach all of it. Deploy on a domain that does nothing else.
+- **Crawlers are kept off `/api/` and `/preview`** in `app/robots.ts`. Indexed, the
+  deployment becomes a copy of every site anyone has ever tested, hosted under this domain.
+- **The render route is an open proxy**, so a public deployment wants a platform rate limit
+  on `/api/render`. There is no application-level limiter, because a serverless function
+  has no shared state to count requests in.
+
+`access-control-allow-origin` is deliberately absent. The frame is same-origin and the
+rewriter strips `crossorigin` and `integrity`, so nothing needs it, and setting it to `*`
+would hand any website on the internet a CORS bypass.
+
 ## The frame is sized to the layout width, not the screen width
 
 `components/device/screen.tsx` sets the iframe to the width the document actually lays out
@@ -151,6 +180,7 @@ lib/
   probe.ts              the injected measurement script, as a source string
   audit.ts              raw numbers to findings. Pure, no React
   net-guard.ts          server-only, refuses private addresses
+  fetch-target.ts       server-only, follows redirects by hand and caps the body
   url.ts                normalisation, shared by both sides
   spring.ts             the settle and the resistance curve. No React
   demo-page.ts          the demo page source
