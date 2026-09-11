@@ -74,9 +74,30 @@ const EXISTING_BASE = /<base\b[^>]*>/gi;
 export function rewriteHtml(html: string, finalUrl: string, appOrigin: string): string {
   let out = html.replace(CSP_META, "").replace(EXISTING_BASE, "");
 
+  /**
+   * Everything in `<head>` that fetches is rewritten, rather than left to the `<base>`.
+   *
+   * The base is injected at the end of `<head>`, so the browser has already parsed and
+   * started fetching every stylesheet, script and preload above it with no base in effect.
+   * Those resolve against this app's origin and 404. The base cannot move to the top of
+   * `<head>` either: that shifts every node React expects and breaks hydration. So the
+   * head's own URLs are made absolute here, and the base is left to serve what the page
+   * resolves later, at runtime.
+   */
+  const FETCHING_RELS = new Set([
+    "stylesheet",
+    "preload",
+    "modulepreload",
+    "prefetch",
+    "icon",
+    "shortcut",
+    "apple-touch-icon",
+    "manifest",
+  ]);
+
   out = out.replace(/<link\b[^>]*>/gi, (tag) => {
     const rel = (attr(tag, "rel") ?? "").toLowerCase();
-    if (!rel.split(/\s+/).includes("stylesheet")) return tag;
+    if (!rel.split(/\s+/).some((value) => FETCHING_RELS.has(value))) return tag;
     const href = attr(tag, "href");
     if (!href) return tag;
     const proxied = toProxy(href, finalUrl, appOrigin);
@@ -84,10 +105,7 @@ export function rewriteHtml(html: string, finalUrl: string, appOrigin: string): 
     return dropAttr(dropAttr(setAttr(tag, "href", proxied), "integrity"), "crossorigin");
   });
 
-  // Module scripts are fetched with CORS, so they have to come through the proxy too.
   out = out.replace(/<script\b[^>]*>/gi, (tag) => {
-    const type = (attr(tag, "type") ?? "").toLowerCase();
-    if (type !== "module") return tag;
     const src = attr(tag, "src");
     if (!src) return tag;
     const proxied = toProxy(src, finalUrl, appOrigin);
@@ -95,11 +113,31 @@ export function rewriteHtml(html: string, finalUrl: string, appOrigin: string): 
     return dropAttr(dropAttr(setAttr(tag, "src", proxied), "integrity"), "crossorigin");
   });
 
+  // A url() inside an inline <style> resolves the same way, and a font declared in the
+  // head is requested before the base exists.
+  out = out.replace(/(<style\b[^>]*>)([\s\S]*?)(<\/style>)/gi, (whole, open, css, close) => {
+    if (/\btype\s*=\s*["']?(?!text\/css)/i.test(open)) return whole;
+    return `${open}${rewriteCss(css, finalUrl, appOrigin)}${close}`;
+  });
+
   const head = [
     `<base href="${finalUrl.replace(/"/g, "&quot;")}">`,
-    `<script>${probeSource(appOrigin)}</script>`,
+    `<script>${probeSource(appOrigin, finalUrl)}</script>`,
   ].join("");
 
+  /**
+   * The injection goes at the END of `<head>`, not the start.
+   *
+   * React hydrates a document by walking the head's children against the ones it expects.
+   * Two extra nodes pushed in front of the first `<meta>` shift every one of them, so
+   * hydration fails, React discards the server HTML and re-renders the whole document,
+   * and everything in `<head>` it does not own is thrown away, including the `<base>` the
+   * page's own URLs depend on. It also means the page under test is no longer the page
+   * the site ships, which is disqualifying for a tool that exists to measure it.
+   */
+  if (/<\/head>/i.test(out)) {
+    return out.replace(/<\/head>/i, (tag) => `${head}${tag}`);
+  }
   if (/<head[^>]*>/i.test(out)) {
     return out.replace(/<head[^>]*>/i, (tag) => `${tag}${head}`);
   }
