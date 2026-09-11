@@ -581,6 +581,40 @@ try {
   check("without stacking history", depth <= 2, `${depth} entries`);
   await share.close();
 
+  console.log("\nThe rewriter leaves the head parseable");
+  const fixture = `${BASE}/__fixtures/head-assets.html`;
+  const rewritten = await (
+    await fetch(`${BASE}/api/render?u=${encodeURIComponent(fixture)}`)
+  ).text();
+  const headHtml = rewritten.slice(rewritten.indexOf("<head"), rewritten.indexOf("</head>"));
+  // Nothing may be injected above the site's own first node. Pushing two elements in
+  // front of the charset shifts every child React expects, hydration fails, React
+  // re-renders the document and throws away the base the page's URLs depend on.
+  check(
+    "nothing is injected above the site's own head",
+    headHtml.indexOf("<meta charset") < headHtml.indexOf("<base"),
+  );
+  check("the base is the last thing in the head", /<base\b[^>]*>\s*<script/.test(headHtml));
+  check(
+    "head scripts are rewritten, not left to the base",
+    /<script\b[^>]*src="[^"]*\/api\/render\?u=[^"]*head-assets\.js/.test(headHtml),
+  );
+  check(
+    "so are preloads",
+    /<link\b[^>]*rel="preload"[^>]*href="[^"]*\/api\/render\?u=/.test(headHtml) ||
+      /<link\b[^>]*href="[^"]*\/api\/render\?u=[^"]*woff2[^"]*"[^>]*rel="preload"/.test(
+        headHtml,
+      ),
+  );
+  check(
+    "and url() inside an inline style",
+    /@font-face[\s\S]*url\("[^"]*\/api\/render\?u=/.test(headHtml),
+  );
+  check(
+    "the probe is told where the document came from",
+    rewritten.includes(`var TARGET = '${fixture}'`),
+  );
+
   console.log("\nThe proxy refuses what it should");
   const proxy = (target) =>
     fetch(`${BASE}/api/render?u=${encodeURIComponent(target)}`, { redirect: "manual" });

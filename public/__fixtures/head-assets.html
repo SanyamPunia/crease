@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Head assets fixture</title>
+  <link rel="stylesheet" href="/__fixtures/head-assets.css">
+  <link rel="preload" as="font" type="font/woff2" href="/__fixtures/head-assets.woff2" crossorigin>
+  <script src="/__fixtures/head-assets.js"></script>
+  <style>@font-face { font-family: fixture; src: url(/__fixtures/head-assets.woff2); }</style>
+</head>
+<body>
+  <h1>A page whose head fetches before the base exists</h1>
+  <p>Everything above is parsed before a base tag placed at the end of the head, so the
+    rewriter has to make those URLs absolute itself.</p>
+</body>
+</html>
