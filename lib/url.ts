@@ -38,3 +38,20 @@ export function displayUrl(raw: string): string {
     return raw;
   }
 }
+
+/**
+ * Read the address a proxy URL stands for, or null when it is not one.
+ *
+ * The probe carries its own copy of this, because it has to run inside a page that has no
+ * modules. Keep the two in step.
+ */
+export function unproxy(value: string, appOrigin: string): string | null {
+  try {
+    const url = new URL(value, appOrigin);
+    if (url.origin !== new URL(appOrigin).origin) return null;
+    if (url.pathname !== "/api/render") return null;
+    return url.searchParams.get("u");
+  } catch {
+    return null;
+  }
+}
