@@ -1,0 +1,28 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Overflow fixture</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 16px; }
+    h1 { font-size: 24px; margin: 0 0 12px; }
+    /* Wider than the cover display on purpose, so the page scrolls sideways. */
+    .wide-table { width: 900px; background: #eee; padding: 12px; margin: 0 0 16px; }
+    .tiny { width: 24px; height: 24px; font-size: 10px; }
+    .fine-print { font-size: 10px; color: #666; }
+    @media (min-width: 500px) { body { padding: 24px; } }
+    @media (min-width: 640px) { h1 { font-size: 32px; } }
+    @media (min-width: 900px) { body { max-width: 880px; margin: 0 auto; } }
+  </style>
+</head>
+<body>
+  <h1>A page that breaks</h1>
+  <div class="wide-table">A block fixed at 900px, wider than the cover display.</div>
+  <p><button class="tiny" type="button">x</button>
+     <button class="tiny" type="button">y</button>
+     <button class="tiny" type="button">z</button></p>
+  <p class="fine-print">Fine print set at 10px, below the legible minimum.</p>
+  <p class="fine-print">A second line of the same fine print.</p>
+</body>
+</html>
