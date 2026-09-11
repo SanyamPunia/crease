@@ -32,6 +32,8 @@ import {
   parseViewportMeta,
   widthForFold,
 } from "@/lib/device";
+import { benchPath, isDemoUrl } from "@/lib/site";
+import { displayUrl } from "@/lib/url";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { clamp, cn } from "@/lib/utils";
 
@@ -137,6 +139,24 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
   );
 
   useEffect(() => () => window.clearTimeout(jumpTimer.current), []);
+
+  /**
+   * The bench's own address follows the site under test, so the link in the browser is
+   * always a link to what is on screen and can be shared as one.
+   *
+   * `replaceState` rather than `pushState`: the framed page reports its own client-side
+   * route changes too, and pushing those would fill the history with entries the user
+   * never navigated to and make Back walk backwards through someone else's site.
+   */
+  useEffect(() => {
+    const next = benchPath(url, window.location.origin);
+    if (next !== window.location.pathname + window.location.search) {
+      window.history.replaceState(null, "", next);
+    }
+    document.title = isDemoUrl(url, window.location.origin)
+      ? "Crease, layout testing for the iPhone Duo"
+      : `${displayUrl(url)} on the iPhone Duo`;
+  }, [url]);
 
   reducedRef.current = reduced;
 
