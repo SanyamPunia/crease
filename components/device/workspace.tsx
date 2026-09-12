@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ChevronUpIcon,
   MinusIcon,
   RectangleHorizontalIcon,
   RectangleVerticalIcon,
@@ -26,6 +27,8 @@ import {
   type Measurement,
   renderState,
   type SweepStep,
+  VERDICT_COPY,
+  worstSeverity,
 } from "@/lib/audit";
 import {
   DETENTS,
@@ -40,6 +43,7 @@ import {
 } from "@/lib/device";
 import { benchPath, isDemoUrl } from "@/lib/site";
 import { displayUrl } from "@/lib/url";
+import { useMediaQuery } from "@/lib/use-media-query";
 import { useReducedMotion } from "@/lib/use-reduced-motion";
 import { clamp, cn } from "@/lib/utils";
 
@@ -92,6 +96,13 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
   const [turnAngle, setTurnAngle] = useState(0);
   const [turning, setTurning] = useState(false);
   const [jumping, setJumping] = useState(false);
+  // Below the sidebar breakpoint the rail is a sheet, closed to begin with. A phone screen
+  // split between a device and six cards leaves the device at a quarter of its size, and
+  // the device is the thing being looked at.
+  const [railOpen, setRailOpen] = useState(false);
+  // One screen is not wide enough for both the device and the room it will need when it
+  // opens. See `stageBox`.
+  const compact = useMediaQuery("(width < 64rem)");
   const reduced = useReducedMotion();
 
   const frame = useRef<HTMLIFrameElement | null>(null);
@@ -228,8 +239,20 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
   const layoutWidth = measurement ? layoutWidthFor(viewportMeta, screenWidth) : screenWidth;
   const zoomedOut = layoutWidth > screenWidth + 1;
 
-  const stageBox =
-    orientation === "portrait"
+  /**
+   * How much room the stage holds open.
+   *
+   * On a wide screen it reserves the device at its widest, so opening the fold moves one
+   * edge and nothing rescales under the pointer mid-drag. A phone cannot afford that: an
+   * 890pt device reserved inside a 390pt screen leaves the cover view at 28%, too small to
+   * read and too small to judge. There the stage holds only what is on screen, so the
+   * device is legible and the scale changes with the fold instead of the position. The
+   * padding has to clear the grip, which straddles the device's moving edge and would
+   * otherwise be clipped by the stage once the device fills the width.
+   */
+  const stageBox = compact
+    ? { w: screenWidth + DUO.bezel * 2, h: screenHeight + DUO.bezel * 2 }
+    : orientation === "portrait"
       ? {
           w: DUO.unfolded.width + DUO.bezel * 2,
           h: Math.max(DUO.cover.height, DUO.unfolded.height) + DUO.bezel * 2,
@@ -238,7 +261,7 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
           w: Math.max(DUO.cover.height, DUO.unfolded.height) + DUO.bezel * 2,
           h: DUO.unfolded.width + DUO.bezel * 2,
         };
-  const { ref: stageRef, fit } = useFitZoom(stageBox.w, stageBox.h, 112);
+  const { ref: stageRef, fit } = useFitZoom(stageBox.w, stageBox.h, compact ? 72 : 112);
 
   const findings: Finding[] | null = useMemo(
     () => (measurement ? evaluate(measurement) : null),
@@ -253,6 +276,23 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
     }
     return byId;
   }, [measurement]);
+
+  // What the collapsed sheet says on a small screen, so the verdict is readable without
+  // opening it.
+  const verdict = findings ? worstSeverity(findings) : null;
+  const railLabel = dead
+    ? "No result"
+    : render === "hidden"
+      ? "Nothing rendered"
+      : render === "waiting"
+        ? "Waiting for the page"
+        : verdict
+          ? VERDICT_COPY[verdict].label
+          : "Measuring";
+  const railTone =
+    !dead && render === "rendered" && verdict
+      ? { pass: "text-pass", warn: "text-warn", fail: "text-fail" }[verdict]
+      : "text-ink";
 
   /**
    * Ask for a measurement until one arrives.
@@ -490,6 +530,7 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
                 sweeping={sweeping}
                 hint={firstRun && !folded && !loading && !sweeping}
                 turnAngle={turnAngle}
+                compact={compact}
                 quiet={turning || (jumping && !dragging)}
                 turning={turning}
               >
@@ -542,18 +583,49 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
             </div>
           </main>
 
-          <aside className="flex min-h-0 w-full shrink-0 basis-[42dvh] flex-col overflow-y-auto bg-paper lg:w-[23rem] lg:basis-auto">
-            <ReportRail
-              findings={dead ? null : findings}
-              dead={dead}
-              render={render}
-              url={url}
-              onReload={reload}
-              totals={totals}
-              framing={framing}
-              onHover={onHover}
-              onReveal={onReveal}
-            />
+          <aside
+            className={cn(
+              "flex min-h-0 w-full shrink-0 flex-col bg-paper lg:w-[23rem] lg:basis-auto lg:overflow-y-auto",
+              railOpen ? "basis-[58dvh]" : "basis-auto",
+            )}
+          >
+            <button
+              type="button"
+              onClick={() => setRailOpen((open) => !open)}
+              aria-expanded={railOpen}
+              className="focus-ring flex h-12 shrink-0 cursor-pointer items-center gap-2 border-rule border-t px-4 text-left transition-colors duration-150 can-hover:hover:bg-hover lg:hidden"
+            >
+              <span className={cn("truncate font-medium text-label", railTone)}>
+                {railLabel}
+              </span>
+              {findings && !dead && render === "rendered" ? (
+                <span className="numeral shrink-0 text-ink-faint text-micro">
+                  {findings.length - findings.filter((f) => f.severity !== "pass").length}/
+                  {findings.length}
+                </span>
+              ) : null}
+              <ChevronUpIcon
+                className={cn(
+                  "ml-auto size-4 shrink-0 text-ink-faint motion-safe:transition-transform motion-safe:duration-200",
+                  railOpen && "rotate-180",
+                )}
+                aria-hidden="true"
+              />
+            </button>
+
+            <div className={cn("min-h-0 flex-1 overflow-y-auto", !railOpen && "max-lg:hidden")}>
+              <ReportRail
+                findings={dead ? null : findings}
+                dead={dead}
+                render={render}
+                url={url}
+                onReload={reload}
+                totals={totals}
+                framing={framing}
+                onHover={onHover}
+                onReveal={onReveal}
+              />
+            </div>
           </aside>
         </div>
       </div>

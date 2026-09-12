@@ -30,6 +30,8 @@ interface StageProps {
   quiet: boolean;
   /** True only through a rotation, when nothing on the device can be aimed at. */
   turning: boolean;
+  /** The stage is holding only what is on screen, so there is no room left to outline. */
+  compact: boolean;
   children: ReactNode;
 }
 
@@ -67,6 +69,7 @@ export function Stage({
   turnAngle,
   quiet,
   turning,
+  compact,
   children,
 }: StageProps) {
   const track = useRef<HTMLDivElement | null>(null);
@@ -329,7 +332,7 @@ export function Stage({
             height: (horizontal ? DUO.unfolded.height + BEZEL : alongMax) * zoom,
             borderRadius: DUO.shellRadius * zoom,
             ...annotation,
-            opacity: quiet || fold > 0.97 ? 0 : 0.85,
+            opacity: quiet || compact || fold > 0.97 ? 0 : 0.85,
           }}
         />
 
@@ -410,97 +413,103 @@ export function Stage({
               : { top: along * zoom, left: "50%", ...motion }
           }
         >
-          <UnfoldHint axis={axis} visible={hint} />
+          <UnfoldHint axis={axis} visible={hint && !compact} />
         </div>
 
         {/* Travel of that edge, cover to unfolded, with the sweep painted into it. The
           ruler sits on the device's moving edge, so a mark on it is the position that
-          edge would be at. */}
-        <div
-          className={cn("absolute flex gap-1.5", horizontal ? "flex-col" : "flex-row")}
-          style={{
-            ...(horizontal
-              ? { left: alongMin * zoom, width: travel, top: box.h * zoom + 16 }
-              : { top: alongMin * zoom, height: travel, left: box.w * zoom + 16 }),
-            ...annotation,
-          }}
-        >
-          <div
-            className={cn(
-              "relative overflow-hidden rounded-full bg-surface-sunk ring-1 ring-rule ring-inset",
-              horizontal ? "h-1.5 w-full" : "h-full w-1.5",
-            )}
-          >
-            {sweep?.map((step, index) => (
-              <span
-                key={step.width}
-                className={cn("absolute", step.overflowBy > 1 ? "bg-fail" : "bg-pass")}
-                style={
-                  horizontal
-                    ? {
-                        left: `${(index / sweep.length) * 100}%`,
-                        width: `${100 / sweep.length}%`,
-                        top: 0,
-                        bottom: 0,
-                      }
-                    : {
-                        top: `${(index / sweep.length) * 100}%`,
-                        height: `${100 / sweep.length}%`,
-                        left: 0,
-                        right: 0,
-                      }
-                }
-              />
-            ))}
-            {sweeping ? (
-              <span className="absolute inset-0 animate-pulse bg-crease-soft" />
-            ) : null}
-          </div>
+          edge would be at.
 
-          {/* Detent labels run along the ruler, so the container has to span the ruler's
-            length on the fold axis. A fixed-height row collapses all three onto one spot
-            when the fold runs vertically. */}
-          <div className={cn("relative", horizontal ? "h-3 w-full" : "h-full w-8")}>
-            {DETENTS.map((detent) => {
-              const at = ((detent.width - MIN_WIDTH) / (MAX_WIDTH - MIN_WIDTH)) * 100;
-              const near = Math.abs(detent.width - foldSize) < 6;
-              const edge = at === 0 ? "start" : at === 100 ? "end" : "middle";
-              return (
+          It spans the whole travel, cover to unfolded, so it needs the room the compact
+          stage does not hold open. There the named stops in the control strip say the same
+          thing and the grip still drags. */}
+        {compact ? null : (
+          <div
+            className={cn("absolute flex gap-1.5", horizontal ? "flex-col" : "flex-row")}
+            style={{
+              ...(horizontal
+                ? { left: alongMin * zoom, width: travel, top: box.h * zoom + 16 }
+                : { top: alongMin * zoom, height: travel, left: box.w * zoom + 16 }),
+              ...annotation,
+            }}
+          >
+            <div
+              className={cn(
+                "relative overflow-hidden rounded-full bg-surface-sunk ring-1 ring-rule ring-inset",
+                horizontal ? "h-1.5 w-full" : "h-full w-1.5",
+              )}
+            >
+              {sweep?.map((step, index) => (
                 <span
-                  key={detent.id}
-                  className={cn(
-                    "numeral absolute text-tick transition-colors duration-150",
-                    near ? "text-ink" : "text-ink-faint",
-                  )}
+                  key={step.width}
+                  className={cn("absolute", step.overflowBy > 1 ? "bg-fail" : "bg-pass")}
                   style={
                     horizontal
                       ? {
-                          left: `${at}%`,
-                          transform:
-                            edge === "start"
-                              ? "translateX(0)"
-                              : edge === "end"
-                                ? "translateX(-100%)"
-                                : "translateX(-50%)",
+                          left: `${(index / sweep.length) * 100}%`,
+                          width: `${100 / sweep.length}%`,
+                          top: 0,
+                          bottom: 0,
                         }
                       : {
-                          top: `${at}%`,
+                          top: `${(index / sweep.length) * 100}%`,
+                          height: `${100 / sweep.length}%`,
                           left: 0,
-                          transform:
-                            edge === "start"
-                              ? "translateY(-0.15em)"
-                              : edge === "end"
-                                ? "translateY(-0.85em)"
-                                : "translateY(-0.5em)",
+                          right: 0,
                         }
                   }
-                >
-                  {detent.width}
-                </span>
-              );
-            })}
+                />
+              ))}
+              {sweeping ? (
+                <span className="absolute inset-0 animate-pulse bg-crease-soft" />
+              ) : null}
+            </div>
+
+            {/* Detent labels run along the ruler, so the container has to span the ruler's
+            length on the fold axis. A fixed-height row collapses all three onto one spot
+            when the fold runs vertically. */}
+            <div className={cn("relative", horizontal ? "h-3 w-full" : "h-full w-8")}>
+              {DETENTS.map((detent) => {
+                const at = ((detent.width - MIN_WIDTH) / (MAX_WIDTH - MIN_WIDTH)) * 100;
+                const near = Math.abs(detent.width - foldSize) < 6;
+                const edge = at === 0 ? "start" : at === 100 ? "end" : "middle";
+                return (
+                  <span
+                    key={detent.id}
+                    className={cn(
+                      "numeral absolute text-tick transition-colors duration-150",
+                      near ? "text-ink" : "text-ink-faint",
+                    )}
+                    style={
+                      horizontal
+                        ? {
+                            left: `${at}%`,
+                            transform:
+                              edge === "start"
+                                ? "translateX(0)"
+                                : edge === "end"
+                                  ? "translateX(-100%)"
+                                  : "translateX(-50%)",
+                          }
+                        : {
+                            top: `${at}%`,
+                            left: 0,
+                            transform:
+                              edge === "start"
+                                ? "translateY(-0.15em)"
+                                : edge === "end"
+                                  ? "translateY(-0.85em)"
+                                  : "translateY(-0.5em)",
+                          }
+                    }
+                  >
+                    {detent.width}
+                  </span>
+                );
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </div>
   );
