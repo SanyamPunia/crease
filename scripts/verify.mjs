@@ -704,6 +704,69 @@ try {
   );
   await fine.close();
 
+  console.log("\nIt works in a hand, not only under a mouse");
+  const phone = await browser.newPage();
+  await phone.setViewport({
+    width: 390,
+    height: 844,
+    deviceScaleFactor: 2,
+    isMobile: true,
+    hasTouch: true,
+  });
+  const phoneCdp = await phone.createCDPSession();
+  await phoneCdp.send("Emulation.setEmulatedMedia", {
+    features: [
+      { name: "pointer", value: "coarse" },
+      { name: "any-pointer", value: "coarse" },
+    ],
+  });
+  await phone.goto(BASE, { waitUntil: "networkidle2" });
+  await wait(4000);
+  const hand = await phone.evaluate(() => {
+    const de = document.documentElement;
+    // The bench's own rule: an inline link in a run of text is exempt from the minimum.
+    const small = [
+      ...document.querySelectorAll("button, a[href], input, [role=button]"),
+    ].filter((el) => {
+      const r = el.getBoundingClientRect();
+      const cs = getComputedStyle(el);
+      if (r.width === 0 || r.height === 0 || cs.visibility === "hidden") return false;
+      if (el.tagName === "A" && cs.display === "inline") return false;
+      return r.width < 44 || r.height < 44;
+    }).length;
+    const tiny = [...document.querySelectorAll("main *, aside *, header *")].filter((el) => {
+      if (el.firstChild?.nodeType !== 3) return false;
+      if (!el.firstChild.nodeValue.trim()) return false;
+      return Number.parseFloat(getComputedStyle(el).fontSize) < 12;
+    }).length;
+    const frame = document.querySelector("iframe")?.getBoundingClientRect();
+    const stage = document.querySelector("main div.hairline.relative")?.getBoundingClientRect();
+    const grip = [...document.querySelectorAll("main *")].find((el) =>
+      /ew-resize|ns-resize/.test(getComputedStyle(el).cursor),
+    );
+    const g = grip?.getBoundingClientRect();
+    return {
+      overflow: de.scrollWidth - de.clientWidth,
+      small,
+      tiny,
+      frameWidth: frame ? Math.round(frame.width) : 0,
+      railHeight: Math.round(
+        document.querySelector("aside")?.getBoundingClientRect().height ?? 0,
+      ),
+      gripInside: !!(g && stage && g.left >= stage.left - 1 && g.right <= stage.right + 1),
+      gripSize: g ? Math.min(Math.round(g.width), Math.round(g.height)) : 0,
+    };
+  });
+  check("the page never scrolls sideways", hand.overflow === 0, `${hand.overflow}px`);
+  check("every control clears 44pt", hand.small === 0, `${hand.small} under`);
+  check("no text renders below 12px", hand.tiny === 0, `${hand.tiny} nodes`);
+  // The stage held the unfolded width open on every screen, which left the device at a
+  // quarter of its size on a phone. It holds only what is on screen there now.
+  check("the device is big enough to read", hand.frameWidth > 240, `${hand.frameWidth}px wide`);
+  check("the rail starts collapsed", hand.railHeight < 80, `${hand.railHeight}px`);
+  check("the grip is a real target inside the stage", hand.gripInside && hand.gripSize >= 44);
+  await phone.close();
+
   console.log("\nThe proxy refuses what it should");
   const proxy = (target) =>
     fetch(`${BASE}/api/render?u=${encodeURIComponent(target)}`, { redirect: "manual" });

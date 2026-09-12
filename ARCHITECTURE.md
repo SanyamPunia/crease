@@ -375,6 +375,30 @@ translate as its own CSS property, so the two compose instead of one overriding 
 and the element moves twice. Symptom: something centred with `left-1/2 -translate-x-1/2`
 sits exactly half its own width off to one side.
 
+## It has to work in a hand
+
+The bench is a dense instrument built for a mouse, and none of that survives a phone
+unchanged. Three things change, all keyed to the pointer or the width rather than to a
+device list.
+
+**The stage holds only what is on screen.** On a wide screen it reserves the device at its
+widest, so opening the fold moves one edge and nothing rescales under the pointer mid-drag.
+An 890pt device reserved inside a 390pt screen leaves the cover view at 28%, too small to
+read and too small to judge, so below the sidebar breakpoint the stage fits the current size
+instead. The ghost outline and the travel ruler go with it, because both span the full
+travel and there is no room for either. The named stops in the control strip say the same
+thing and the grip still drags.
+
+**The rail is a sheet.** A phone split between a device and six cards leaves the device at a
+quarter of its size. Below `lg` the rail collapses to a bar carrying the verdict and the
+pass count, and opens to 58dvh when tapped.
+
+**Controls and type step up where the pointer is coarse**, through the `coarse` variant and
+a block at the end of `globals.css`. Keyed to `pointer: coarse` rather than to width,
+because a tablet is held at the same distance as a phone. `scripts/verify.mjs` drives the
+app at 390px with a coarse pointer and fails the build on sideways scroll, on any control
+under 44pt, or on any text under 12px.
+
 ## Commands
 
 ```bash
