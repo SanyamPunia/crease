@@ -48,7 +48,10 @@ export function AddressBar({ url, loading, onNavigate, onReload }: AddressBarPro
           aria-invalid={invalid}
           spellCheck={false}
           autoComplete="off"
-          className={cn("h-8 pr-8 text-micro placeholder:text-micro", invalid && "border-fail")}
+          className={cn(
+            "h-8 pr-8 text-micro coarse:h-11 placeholder:text-micro",
+            invalid && "border-fail",
+          )}
         />
         {loading ? (
           <span

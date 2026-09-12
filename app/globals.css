@@ -4,6 +4,10 @@
    behind a pointer that can actually hover. */
 @custom-variant can-hover (@media (hover: hover) and (pointer: fine));
 
+/* A finger is not a cursor. Controls tuned for a dense desktop instrument are too small
+   to hit, so the ones that matter grow where the pointer is coarse. */
+@custom-variant coarse (@media (pointer: coarse));
+
 /* Light only: the bench renders web pages on a white screen, and dark chrome around a
    white rectangle is a glare sandwich. Near-white paper, pure white surfaces, soft rules. */
 :root {
@@ -250,5 +254,29 @@
   }
   100% {
     filter: blur(0);
+  }
+}
+
+/* The scale is built for a dense instrument driven with a mouse. Held in a hand it needs a
+   step up, so the three smallest sizes grow wherever the pointer is coarse. Keyed to the
+   pointer rather than the width, because a tablet is read at arm's length too. These sit
+   outside every layer on purpose, so they win over the generated utilities. */
+@media (pointer: coarse) {
+  .text-tick {
+    font-size: 0.75rem;
+  }
+
+  /* .eyebrow applies its size rather than referencing the utility, so the step above does
+     not reach it. */
+  .eyebrow {
+    font-size: 0.8125rem;
+  }
+  .text-micro {
+    font-size: 0.8125rem;
+    line-height: 1.2rem;
+  }
+  .text-label {
+    font-size: 0.875rem;
+    line-height: 1.25rem;
   }
 }

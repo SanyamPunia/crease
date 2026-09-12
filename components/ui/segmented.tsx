@@ -65,7 +65,7 @@ export function Segmented<T extends string>({
       ref={track}
       aria-label={label}
       className={cn(
-        "hairline relative inline-flex h-8 items-center rounded-full bg-surface p-1",
+        "hairline relative inline-flex h-8 items-center rounded-full bg-surface p-1 coarse:h-12 coarse:p-0.5",
         className,
       )}
     >
@@ -75,7 +75,7 @@ export function Segmented<T extends string>({
           className={cn(
             // transform and opacity only. Segments are equal width, so the indicator is a
             // pure translate and its own width never animates.
-            "absolute top-1 bottom-1 left-0 rounded-full bg-ink transition-[opacity] duration-200 motion-safe:transition-[transform,opacity] motion-safe:duration-250 motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
+            "absolute top-1 bottom-1 left-0 rounded-full bg-ink coarse:top-0.5 coarse:bottom-0.5 transition-[opacity] duration-200 motion-safe:transition-[transform,opacity] motion-safe:duration-250 motion-safe:ease-[cubic-bezier(0.32,0.72,0,1)]",
             selected ? "opacity-100" : "opacity-0",
           )}
           style={{ width: pill.width, transform: `translateX(${pill.left}px)` }}

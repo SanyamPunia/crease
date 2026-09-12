@@ -13,9 +13,9 @@ const VARIANT: Record<Variant, string> = {
 };
 
 const SIZE: Record<Size, string> = {
-  xs: "h-8 px-3 text-micro gap-1.5",
-  sm: "h-9 px-3.5 text-label gap-1.5",
-  md: "h-10 px-4 text-label gap-2",
+  xs: "h-8 coarse:h-11 px-3 coarse:px-4 text-micro gap-1.5",
+  sm: "h-9 coarse:h-11 px-3.5 coarse:px-4 text-label gap-1.5",
+  md: "h-10 coarse:h-11 px-4 text-label gap-2",
   lg: "h-12 px-6 text-body gap-2",
 };
 
@@ -47,9 +47,9 @@ export function Button({
 }
 
 const ICON_SIZE: Record<Size, string> = {
-  xs: "size-8",
-  sm: "size-9",
-  md: "size-10",
+  xs: "size-8 coarse:size-11",
+  sm: "size-9 coarse:size-11",
+  md: "size-10 coarse:size-11",
   lg: "size-12",
 };
 

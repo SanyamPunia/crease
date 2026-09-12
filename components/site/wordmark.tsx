@@ -8,7 +8,7 @@ export function Wordmark({ className }: { className?: string }) {
     <Link
       href="/"
       className={cn(
-        "focus-ring group flex items-center gap-2 rounded-full transition-opacity duration-150 hover:opacity-70",
+        "focus-ring group flex items-center gap-2 rounded-full transition-opacity duration-150 coarse:min-h-11 hover:opacity-70",
         className,
       )}
     >
