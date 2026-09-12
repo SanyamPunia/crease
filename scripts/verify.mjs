@@ -658,6 +658,52 @@ try {
     `status ${orphan.status}`,
   );
 
+  console.log("\nA page that never renders is not given a verdict");
+  const hidden = await browser.newPage();
+  await hidden.goto(
+    `${BASE}/preview?url=${encodeURIComponent(`${BASE}/__fixtures/hidden.html`)}`,
+    {
+      waitUntil: "networkidle2",
+    },
+  );
+  await wait(2500);
+  const holding = await hidden.evaluate(() =>
+    document.querySelector("aside h2")?.textContent?.trim(),
+  );
+  check("it waits before calling a page blank", holding === "Waiting for the page", holding);
+  await wait(11000);
+  const settled = await hidden.evaluate(() =>
+    document.querySelector("aside h2")?.textContent?.trim(),
+  );
+  check("then says nothing rendered", settled === "Nothing rendered", settled);
+  check(
+    "and gives the reason rather than a verdict",
+    await hidden.evaluate(() =>
+      /JavaScript|scripts/.test(document.querySelector("aside")?.textContent ?? ""),
+    ),
+  );
+  await hidden.close();
+
+  // The same check must leave a page that does render alone, which is the whole risk: a
+  // sound page whose content is mostly collapsed or below the fold is not a blank one.
+  const fine = await browser.newPage();
+  await fine.goto(
+    `${BASE}/preview?url=${encodeURIComponent(`${BASE}/__fixtures/overflow.html`)}`,
+    {
+      waitUntil: "networkidle2",
+    },
+  );
+  await wait(3000);
+  const rendered = await fine.evaluate(() =>
+    document.querySelector("aside h2")?.textContent?.trim(),
+  );
+  check(
+    "a page that renders still gets one",
+    !/Nothing rendered|Waiting/.test(rendered ?? ""),
+    rendered,
+  );
+  await fine.close();
+
   console.log("\nThe proxy refuses what it should");
   const proxy = (target) =>
     fetch(`${BASE}/api/render?u=${encodeURIComponent(target)}`, { redirect: "manual" });

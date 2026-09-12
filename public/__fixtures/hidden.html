@@ -1,0 +1,31 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Hidden fixture</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; margin: 0; padding: 24px; }
+    /* A site that reveals its content with JavaScript ships exactly this, then flips the
+       wrapper to opacity 1 on mount. Here nothing ever flips it, which is what the bench
+       sees when a page's scripts load but never run. */
+    .reveal { opacity: 0; }
+  </style>
+</head>
+<body>
+  <div class="reveal">
+    <h1>A page that never reveals itself</h1>
+    <p>Every element below is in the markup and none of it is on screen.</p>
+    <p>The measurements would all read correctly and all be worthless.</p>
+    <ul>
+      <li>One item</li>
+      <li>Two items</li>
+      <li>Three items</li>
+      <li>Four items</li>
+      <li>Five items</li>
+      <li>Six items</li>
+    </ul>
+    <p><a href="/">A link nobody can see</a></p>
+  </div>
+</body>
+</html>
