@@ -1,10 +1,15 @@
 "use client";
 
-import { TriangleAlertIcon } from "lucide-react";
+import {
+  ExternalLinkIcon,
+  EyeOffIcon,
+  LoaderCircleIcon,
+  TriangleAlertIcon,
+} from "lucide-react";
 import { memo } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { type Finding, VERDICT_COPY, worstSeverity } from "@/lib/audit";
+import { type Finding, type RenderState, VERDICT_COPY, worstSeverity } from "@/lib/audit";
 import { cn } from "@/lib/utils";
 import { FindingRow } from "./finding-row";
 
@@ -14,6 +19,10 @@ interface ReportRailProps {
   totals: Record<string, number>;
   /** The frame is showing the browser's error page rather than the site. */
   dead: boolean;
+  /** Whether the page is on screen, still arriving, or served hidden and never revealed. */
+  render: RenderState;
+  /** The address under test, for the escape hatch out to a real browser tab. */
+  url: string;
   onReload: () => void;
   framing: string[];
   onHover: (refs: number[] | null, tone: "fail" | "warn") => void;
@@ -38,6 +47,8 @@ function Rail({
   findings,
   totals,
   dead,
+  render,
+  url,
   onReload,
   framing,
   onHover,
@@ -58,6 +69,63 @@ function Rail({
         <Button size="sm" onClick={onReload} className="self-start">
           Reload
         </Button>
+      </div>
+    );
+  }
+
+  // Measurements read correctly off markup nobody can see, so a verdict here would be a
+  // confident lie. Say what happened instead.
+  if (render === "hidden") {
+    return (
+      <div className="flex flex-col gap-3 p-4">
+        <p className="eyebrow">Verdict</p>
+        <h2 className="flex items-center gap-2 font-semibold text-ink text-title">
+          <EyeOffIcon className="size-5 text-warn" aria-hidden="true" />
+          Nothing rendered
+        </h2>
+        <p className="text-ink-muted text-micro leading-relaxed">
+          The markup arrived in full, but this site keeps its content hidden until its own
+          JavaScript reveals it, and that JavaScript never started.
+        </p>
+        <p className="text-ink-faint text-micro leading-relaxed">
+          To measure a page from the inside, Crease has to serve it from its own address, and
+          some bundlers work out where their code lives from the address it was served at. On
+          those sites the scripts load but never run. It is a limit of the bench, not a fault in
+          the site, so no verdict is shown.
+        </p>
+        <div className="flex flex-wrap gap-2 pt-1">
+          <Button size="sm" onClick={onReload}>
+            Try again
+          </Button>
+          <a
+            href={url}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="focus-ring inline-flex h-9 shrink-0 cursor-pointer items-center justify-center gap-1.5 rounded-full bg-transparent px-3.5 font-medium text-ink-muted text-label transition-[background-color,color,transform] duration-150 can-hover:hover:bg-hover can-hover:hover:text-ink motion-safe:active:scale-[0.97]"
+          >
+            Open the site
+            <ExternalLinkIcon className="size-3.5" aria-hidden="true" />
+          </a>
+        </div>
+      </div>
+    );
+  }
+
+  if (render === "waiting") {
+    return (
+      <div className="flex flex-col gap-3 p-4">
+        <p className="eyebrow">Verdict</p>
+        <h2 className="flex items-center gap-2 font-semibold text-ink text-title">
+          <LoaderCircleIcon
+            className="size-5 text-ink-faint motion-safe:animate-spin"
+            aria-hidden="true"
+          />
+          Waiting for the page
+        </h2>
+        <p className="text-ink-muted text-micro leading-relaxed">
+          The markup is here but nothing is on screen yet. This site reveals its content once
+          its own scripts run, so the bench is waiting rather than measuring an empty page.
+        </p>
       </div>
     );
   }

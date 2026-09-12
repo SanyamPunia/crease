@@ -20,7 +20,13 @@ import { Button } from "@/components/ui/button";
 import { MetaDot } from "@/components/ui/meta-dot";
 import { Segmented } from "@/components/ui/segmented";
 import { Tooltip, TooltipProvider } from "@/components/ui/tooltip";
-import { evaluate, type Finding, type Measurement, type SweepStep } from "@/lib/audit";
+import {
+  evaluate,
+  type Finding,
+  type Measurement,
+  renderState,
+  type SweepStep,
+} from "@/lib/audit";
 import {
   DETENTS,
   DUO,
@@ -208,6 +214,8 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
       : { transitionDuration: "0ms" };
   const screenWidth = orientation === "portrait" ? foldSize : across;
   const screenHeight = orientation === "portrait" ? across : foldSize;
+
+  const render = renderState(measurement);
 
   const viewportMeta = useMemo(
     () => parseViewportMeta(measurement?.viewportMetaRaw ?? null),
@@ -538,6 +546,8 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
             <ReportRail
               findings={dead ? null : findings}
               dead={dead}
+              render={render}
+              url={url}
               onReload={reload}
               totals={totals}
               framing={framing}
