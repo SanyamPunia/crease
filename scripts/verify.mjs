@@ -755,6 +755,14 @@ try {
       ),
       gripInside: !!(g && stage && g.left >= stage.left - 1 && g.right <= stage.right + 1),
       gripSize: g ? Math.min(Math.round(g.width), Math.round(g.height)) : 0,
+      stageOverflow: stage
+        ? Math.round(
+            document.querySelector("main div.hairline.relative").scrollWidth -
+              document.querySelector("main div.hairline.relative").clientWidth,
+          )
+        : -1,
+      gapL: frame && stage ? Math.round(frame.left - stage.left) : -1,
+      gapR: frame && stage ? Math.round(stage.right - frame.right) : -1,
     };
   });
   check("the page never scrolls sideways", hand.overflow === 0, `${hand.overflow}px`);
@@ -765,6 +773,14 @@ try {
   check("the device is big enough to read", hand.frameWidth > 240, `${hand.frameWidth}px wide`);
   check("the rail starts collapsed", hand.railHeight < 80, `${hand.railHeight}px`);
   check("the grip is a real target inside the stage", hand.gripInside && hand.gripSize >= 44);
+  // The zoom was worked out against the compact box while the stage still drew itself at
+  // the unfolded size, so the device sat in the corner of a box wider than its container.
+  check("nothing overflows the stage", hand.stageOverflow === 0, `${hand.stageOverflow}px`);
+  check(
+    "the device is centred in it",
+    Math.abs(hand.gapL - hand.gapR) <= 2,
+    `${hand.gapL} / ${hand.gapR}`,
+  );
   await phone.close();
 
   console.log("\nThe proxy refuses what it should");

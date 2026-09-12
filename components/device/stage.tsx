@@ -97,9 +97,19 @@ export function Stage({
   // no longer constant.
   const across = heightForFold(fold);
   const screen = horizontal ? { w: foldSize, h: across } : { w: across, h: foldSize };
-  const box = horizontal
-    ? { w: MAX_WIDTH + BEZEL, h: MAX_ACROSS + BEZEL }
-    : { w: MAX_ACROSS + BEZEL, h: MAX_WIDTH + BEZEL };
+  /**
+   * The area the stage draws into.
+   *
+   * Normally the device at its widest, so opening the fold moves one edge and the grid
+   * under it never resizes. Compact holds only what is on screen: the zoom is worked out
+   * against the same box, and a stage still sized for the unfolded device would overflow
+   * its container and strand the device in the corner of it.
+   */
+  const box = compact
+    ? { w: screen.w + BEZEL, h: screen.h + BEZEL }
+    : horizontal
+      ? { w: MAX_WIDTH + BEZEL, h: MAX_ACROSS + BEZEL }
+      : { w: MAX_ACROSS + BEZEL, h: MAX_WIDTH + BEZEL };
 
   const along = (horizontal ? screen.w : screen.h) + BEZEL;
   const alongMin = MIN_WIDTH + BEZEL;
@@ -269,9 +279,12 @@ export function Stage({
 
   // The gutters sit on the fold axis: the dimension line before the device, the ruler
   // after it. The cross axis needs none.
+  const lead = LEAD_GUTTER;
+  // The trailing gutter belongs to the travel ruler, which compact does not draw.
+  const trail = compact ? 0 : TRAIL_GUTTER;
   const outer = horizontal
-    ? { w: box.w * zoom, h: box.h * zoom + LEAD_GUTTER + TRAIL_GUTTER }
-    : { w: box.w * zoom + LEAD_GUTTER + TRAIL_GUTTER, h: box.h * zoom };
+    ? { w: box.w * zoom, h: box.h * zoom + lead + trail }
+    : { w: box.w * zoom + lead + trail, h: box.h * zoom };
 
   return (
     <div className="relative" style={{ width: outer.w, height: outer.h }}>
@@ -281,8 +294,8 @@ export function Stage({
         style={{
           width: box.w * zoom,
           height: box.h * zoom,
-          top: horizontal ? LEAD_GUTTER : 0,
-          left: horizontal ? 0 : LEAD_GUTTER,
+          top: horizontal ? lead : 0,
+          left: horizontal ? 0 : lead,
         }}
       >
         {/* Dimension line, the way a width is called out on a drawing. */}
@@ -323,18 +336,22 @@ export function Stage({
         </div>
 
         {/* Where the device reaches when fully open. Without this the stage is mostly
-            empty grid at Cover, which is the state everyone sees first. */}
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute top-0 left-0 border border-rule-strong border-dashed transition-opacity duration-300"
-          style={{
-            width: (horizontal ? alongMax : DUO.unfolded.height + BEZEL) * zoom,
-            height: (horizontal ? DUO.unfolded.height + BEZEL : alongMax) * zoom,
-            borderRadius: DUO.shellRadius * zoom,
-            ...annotation,
-            opacity: quiet || compact || fold > 0.97 ? 0 : 0.85,
-          }}
-        />
+            empty grid at Cover, which is the state everyone sees first. Compact does not
+            draw it: the stage holds only the current size there, so an outline of the
+            unfolded device is both meaningless and wider than the box it sits in. */}
+        {compact ? null : (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-0 left-0 border border-rule-strong border-dashed transition-opacity duration-300"
+            style={{
+              width: (horizontal ? alongMax : DUO.unfolded.height + BEZEL) * zoom,
+              height: (horizontal ? DUO.unfolded.height + BEZEL : alongMax) * zoom,
+              borderRadius: DUO.shellRadius * zoom,
+              ...annotation,
+              opacity: quiet || fold > 0.97 ? 0 : 0.85,
+            }}
+          />
+        )}
 
         {/* The device, pinned to the origin so the fold only ever moves one edge. */}
         <div
@@ -405,16 +422,18 @@ export function Stage({
         {/* A zero-size anchor on the grip. The hint hangs off it, so it tracks the grip
             on whichever axis the fold is moving. A slider role must not wrap content of
             its own, which is why this is a sibling. */}
-        <div
-          className="pointer-events-none absolute size-0"
-          style={
-            horizontal
-              ? { left: along * zoom, top: "50%", ...motion }
-              : { top: along * zoom, left: "50%", ...motion }
-          }
-        >
-          <UnfoldHint axis={axis} visible={hint && !compact} />
-        </div>
+        {compact ? null : (
+          <div
+            className="pointer-events-none absolute size-0"
+            style={
+              horizontal
+                ? { left: along * zoom, top: "50%", ...motion }
+                : { top: along * zoom, left: "50%", ...motion }
+            }
+          >
+            <UnfoldHint axis={axis} visible={hint} />
+          </div>
+        )}
 
         {/* Travel of that edge, cover to unfolded, with the sweep painted into it. The
           ruler sits on the device's moving edge, so a mark on it is the position that
