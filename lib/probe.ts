@@ -34,6 +34,17 @@ const SOURCE = `
   var MIN_TEXT = 12;
   var seq = 0;
   var overlay = null;
+  var blankRuns = 0;
+  /** Roughly six seconds of retries before the page is called unrenderable. */
+  var BLANK_LIMIT = 7;
+  /**
+   * How many things have to be on the first screen before it counts as rendered.
+   *
+   * A count, not a share. Plenty of sound pages keep most of their markup collapsed or
+   * below the fold: GitHub shows 8 visible items out of 84 on a phone and Vercel 7 out of
+   * 61, and both look perfectly normal. A page that has not rendered shows nought or one.
+   */
+  var VISIBLE_FLOOR = 4;
 
   function post(payload) {
     payload.duo = true;
@@ -294,6 +305,7 @@ const SOURCE = `
     var started = Date.now();
     var root = document.documentElement;
     var clientWidth = root.clientWidth;
+    var clientHeight = root.clientHeight;
     var scrollWidth = Math.max(root.scrollWidth, document.body ? document.body.scrollWidth : 0);
     var offsetX = window.scrollX || window.pageXOffset || 0;
 
@@ -404,6 +416,46 @@ const SOURCE = `
     var breakpoints = readBreakpoints();
     var meta = document.querySelector('meta[name="viewport" i]');
 
+    /**
+     * How much of the page a reader can actually see.
+     *
+     * A site that hides everything until its own JavaScript reveals it serves complete
+     * markup at opacity 0. Every measurement below reads correctly off that markup and
+     * every one of them is meaningless, because nothing is on screen. Counting visible
+     * content is the only way the bench can tell the two apart.
+     */
+    var content = document.querySelectorAll('h1, h2, h3, p, li, img, button, a[href]');
+    var contentTotal = 0;
+    var contentVisible = 0;
+    var contentLimit = Math.min(content.length, 800);
+    for (i = 0; i < contentLimit; i++) {
+      el = content[i];
+      if (el.tagName !== 'IMG' && (el.textContent || '').trim().length < 3) continue;
+      rect = el.getBoundingClientRect();
+      // Only what lands on the first screen counts. Plenty of sound pages keep most of
+      // their markup in a collapsed menu or below the fold, and an absolute ratio calls
+      // those blank. What matters is whether the screen the reader is looking at is empty.
+      if (rect.width === 0 || rect.height === 0) continue;
+      if (rect.bottom <= 0 || rect.top >= clientHeight) continue;
+      if (rect.right <= 0 || rect.left >= clientWidth) continue;
+      contentTotal += 1;
+      if (!el.checkVisibility) { contentVisible += 1; continue; }
+      if (el.checkVisibility({
+        checkOpacity: true,
+        checkVisibilityCSS: true,
+        contentVisibilityAuto: true
+      })) contentVisible += 1;
+    }
+    // A first screen this sparse has nothing to hide, so do not accuse it of hiding anything.
+    if (contentTotal < 8) { contentTotal = 0; contentVisible = 0; }
+    if (contentTotal > 0 && contentVisible < VISIBLE_FLOOR) {
+      blankRuns += 1;
+      // Give a slow reveal room to arrive before the bench calls it unrenderable.
+      if (blankRuns < BLANK_LIMIT) schedule(900);
+    } else {
+      blankRuns = 0;
+    }
+
     post({
       type: 'measurement',
       data: {
@@ -423,6 +475,12 @@ const SOURCE = `
         unreadableSheets: breakpoints.unreadable,
         wideImages: wideImages,
         elementCount: count,
+        contentTotal: contentTotal,
+        contentVisible: contentVisible,
+        // How many times in a row the page has come back invisible, so the bench can wait
+        // before it gives up rather than flashing an error at a slow page.
+        blankRuns: blankRuns,
+        blankLimit: BLANK_LIMIT,
         truncated: count > MAX_ELEMENTS,
         tookMs: Date.now() - started
       }

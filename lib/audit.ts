@@ -32,9 +32,33 @@ export interface Measurement {
   unreadableSheets: number;
   wideImages: ElementSample[];
   elementCount: number;
+  /** Content elements counted, and how many of them a reader can actually see. */
+  contentTotal: number;
+  contentVisible: number;
+  blankRuns: number;
+  blankLimit: number;
   truncated: boolean;
   tookMs: number;
 }
+
+/**
+ * Whether the page is rendering at all.
+ *
+ * `hidden` means complete markup that nobody can see, which happens when a site keeps its
+ * content at opacity 0 until its own JavaScript reveals it and that JavaScript did not run.
+ * Every other measurement still reads correctly off that markup, and every one of them is
+ * worthless, so the bench reports this instead of a verdict.
+ */
+export type RenderState = "rendered" | "waiting" | "hidden";
+
+export function renderState(measurement: Measurement | null): RenderState {
+  if (!measurement || measurement.contentTotal === 0) return "rendered";
+  if (measurement.contentVisible >= VISIBLE_FLOOR) return "rendered";
+  return measurement.blankRuns >= measurement.blankLimit ? "hidden" : "waiting";
+}
+
+/** Kept in step with the same number in `lib/probe.ts`, which decides when to keep waiting. */
+const VISIBLE_FLOOR = 4;
 
 export type Severity = "pass" | "warn" | "fail";
 
