@@ -89,18 +89,26 @@ export function Segmented<T extends string>({
             key={option.value}
             type="button"
             aria-pressed={active}
+            aria-label={option.label}
             data-active={active}
             title={option.hint}
             onClick={() => onChange(option.value)}
             className={cn(
               "focus-ring relative flex h-full flex-1 cursor-pointer items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 font-medium text-micro transition-colors duration-200",
+              // Dropping the label must not drop the hit area under the minimum the bench
+              // itself checks for.
+              option.icon && "max-[30rem]:min-w-11",
               active && selected
                 ? "text-ink-inverse"
                 : "text-ink-muted can-hover:hover:text-ink",
             )}
           >
             {option.icon}
-            {option.label}
+            {/* A segment carrying an icon can stand on it alone. The control strip needs
+                415px with every label spelled out and a phone has 360, so the orientation
+                pair drops to its icons rather than being cut off the edge. The name stays
+                on the button, so nothing is lost to a screen reader. */}
+            <span className={cn(option.icon && "max-[30rem]:sr-only")}>{option.label}</span>
           </button>
         );
       })}

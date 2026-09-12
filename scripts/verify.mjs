@@ -763,6 +763,10 @@ try {
         : -1,
       gapL: frame && stage ? Math.round(frame.left - stage.left) : -1,
       gapR: frame && stage ? Math.round(stage.right - frame.right) : -1,
+      clipped: [...document.querySelectorAll("main > div, header > div")].reduce(
+        (worst, el) => Math.max(worst, Math.round(el.scrollWidth - el.clientWidth)),
+        0,
+      ),
     };
   });
   check("the page never scrolls sideways", hand.overflow === 0, `${hand.overflow}px`);
@@ -781,6 +785,9 @@ try {
     Math.abs(hand.gapL - hand.gapR) <= 2,
     `${hand.gapL} / ${hand.gapR}`,
   );
+  // The control strip needs 415px with every label spelled out and a phone has 360, so a
+  // segment carrying an icon drops to it rather than running off the edge.
+  check("no row is cut off the edge", hand.clipped === 0, `${hand.clipped}px`);
   await phone.close();
 
   console.log("\nThe proxy refuses what it should");

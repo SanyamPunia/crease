@@ -569,7 +569,9 @@ export function Workspace({ initialUrl, firstRun = false }: WorkspaceProps) {
                 Scale <span className="numeral text-ink">{Math.round(fit * 100)}%</span>
               </span>
               {measurement ? (
-                <span className="flex shrink-0 items-center gap-1.5">
+                // Diagnostics rather than results. The row is cut off at the narrowest
+                // widths with them in, and the dimensions are what matter there.
+                <span className="hidden shrink-0 items-center gap-1.5 sm:flex">
                   <span className="numeral text-ink">{measurement.elementCount}</span> nodes
                   <MetaDot />
                   <span className="numeral text-ink">{measurement.tookMs}ms</span>
